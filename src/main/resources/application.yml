@@ -1,0 +1,5 @@
+micronaut:
+  application:
+    name: partyPresenceMessageBroker
+party-presence-message-broker:
+  keepalive-timeout: 120

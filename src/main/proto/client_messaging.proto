@@ -1,0 +1,84 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "ca.ozluminaire.partypresence";
+
+package ca.ozluminaire.partypresence;
+
+service ClientMessagingEndpoint {
+  rpc beginStream (stream ClientMessage) returns (stream ClientMessage) {}
+}
+
+enum ClientMessageType {
+  // Generic failure, refer to status code for more context.
+  ERROR = 0;
+
+  // Generic OK, when used with `ack_message_ids` indicates acknowledgment of messages
+  ACK = 1;
+
+  // Client join message. Must be the first message from client to broker.
+  // Must not be used by the client in any other message.
+  // When sent from broker to client; indicates that a new client has joined.
+  JOIN = 2;
+
+  // Client leave message. Must be the last message from client to broker.
+  // The message broker will invalidate the client session and close the transport.
+  // When sent from message broker to client; indicates that a client has left
+  LEAVE = 3;
+
+  // Participant list message, sent from broker to client on initial session creation/resume
+  LIST = 4;
+
+  // Keepalive message from client to server
+  PING = 5;
+}
+
+enum StatusCode {
+  OK = 0;
+  INTERNAL_ERROR = 1;
+  CLIENT_TIMEOUT = 2;
+  SESSION_ID_IN_USE = 3;
+}
+
+message ClientMessage {
+  // Client generated identifier, only required on the first message from the client to the stream.
+  // If a stream is ungracefully disconnected and the session TTL has not elapsed, the client should
+  // use the existing id to resume a previous stream.
+  fixed64 session_id = 1;
+
+  // Unique immutable client identifier that always refers to the message originator. Must be set by the client in the
+  // initial JOIN message. Should not be set in any other message from client to broker.
+  fixed64 client_id = 2;
+
+  // Unique immutable party identifier. This field must be set by the client in the initial JOIN message. It should not
+  // be set in any other message from client to broker.
+  fixed64 party_id = 3;
+
+  // Unique message deduplication ID
+  fixed64 message_id = 4;
+
+  // Message type identifier, required in every message.
+  ClientMessageType message_type = 5;
+
+  // Timestamp for the message in elapsed milliseconds since January 1, 1970 00:00Z
+  // Must not be set in any message from the client. Must be set for any message received
+  // in the stream from the message broker.
+  fixed64 timestamp = 6;
+
+  // List of client_ids and session_ids for party participants. Set by the message broker in LIST message.
+  // Must not be set in any other message.
+  repeated ClientSessionIdEntry participant_client_ids = 10;
+
+  // list of message_ids that the client or server is acknowledging receipt of.
+  repeated fixed64 ack_message_ids = 14;
+
+  // Status code, default is 0 = normal completion of request.
+  StatusCode status_code = 15;
+}
+
+// clients with multiple sessions will have all their session IDs mapped separately so that the client can keep track
+// of clients with multiple sessions
+message ClientSessionIdEntry {
+  fixed64 client_id = 1;
+  repeated fixed64 session_id = 2;
+}
